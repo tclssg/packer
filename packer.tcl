@@ -33,15 +33,12 @@ proc ::packer::init {} {
         # The Git repository to clone. Can be local or remote.
         sourceRepository    {https://github.com/tclssg/tclssg}
 
-        # The directory
+        # The directory that will appear one the sourceRepository is clones.
         projectDir          {tclssg}
 
-        #
-        targetFilename      "tclssg.kit"
-
-        # Whether to append the targetTclkit's file extension (e.g., ".exe")
-        # to the file name.
-        appendTclkitExtension 1
+        # The filename of the Starpack to create. Should not have an extension
+        # by default -- see "suffix" below for how extensions are added.
+        targetFilename      "tclssg"
 
         # Which file within the projectDir the Starpack should run on start.
         fileToRun           {ssg.tcl}
@@ -52,8 +49,8 @@ proc ::packer::init {} {
 
         # The string to append to the targetFilename before the extension. If
         # not set everything after the first dash in the targetTclkit's rootname
-        # is used. E.g, if targetTclkit is "tclssg-8.6.3-win32.kit.exe" the
-        # default suffix will be "-8.6.3-win32.kit"
+        # is used. E.g, if targetTclkit is "tclkit-8.6.3-win32.exe" the
+        # default suffix will be "-8.6.3-win32.exe".
         # suffix {}
     }]
 }
@@ -69,8 +66,7 @@ proc ::packer::build args {
     set buildPath [file join $packerPath $buildPath]
     set artifactsPath [file join $packerPath $artifactsPath]
     if {![info exists suffix]} {
-        set suffix -[join [lrange [split \
-                [file rootname $targetTclkit] -] 1 end] -]
+        set suffix -[join [lrange [split $targetTclkit -] 1 end] -]
     }
 
     # Define procs for running external commands.
@@ -122,7 +118,9 @@ proc ::packer::build args {
                     [file join $buildPath "${projectDir}.vfs" lib tcllib]]
         }
 
-        # Wrap the Starpack.
+        # Wrap the Starpack. We make a temporary copy of the targetTclkit
+        # in case it is the same as buildTclkit, which we wouldn't be able to
+        # read.
         file copy $targetTclkit "${targetTclkit}.temp"
         tclkit $sdx wrap $targetFilename -runtime "${targetTclkit}.temp"
         file delete "${targetTclkit}.temp"
@@ -135,11 +133,7 @@ proc ::packer::build args {
 
         # Store the build artifact.
         file mkdir $artifactsPath
-        set artifactFilename \
-                [add-suffix-before-extension $targetFilename $suffix]
-        if {[info exists appendTclkitExtension] && $appendTclkitExtension} {
-            append artifactFilename [file extension $targetTclkit]
-        }
+        set artifactFilename "$targetFilename$suffix"
         file copy -force $targetFilename \
                 [file join $artifactsPath $artifactFilename]
     }
