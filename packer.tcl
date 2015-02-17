@@ -21,36 +21,38 @@ proc ::packer::init {} {
         # The Tclkit to run SDX with.
         buildTclkit         {tclkit-8.6.3-rhel5-x86_64}
 
-        # The Tclkit to use as runtime in the Starpack.
+        # The Tclkit to use as the runtime in the Starpack.
         targetTclkit        {tclkit-8.6.3-rhel5-x86_64}
 
-        # SDX Starkit.
+        # SDX Starkit file.
         sdx                 {sdx-20110317.kit}
 
-        # Tcllib archive.
+        # Tcllib archive file.
         tcllib              {Tcllib-1.16.tar.gz}
 
         # The Git repository to clone. Can be local or remote.
         sourceRepository    {https://github.com/tclssg/tclssg}
 
-        # The directory that will appear one the sourceRepository is clones.
+        # The directory that will appear once the sourceRepository is cloned.
         projectDir          {tclssg}
 
-        # The filename of the Starpack to create. Should not have an extension
-        # by default -- see "suffix" below for how extensions are added.
+        # The filename of the Starpack to create. Normally should not include an
+        # extension -- see "suffix" below for how extensions are added
+        # automatically.
         targetFilename      "tclssg"
 
         # Which file within the projectDir the Starpack should run on start.
         fileToRun           {ssg.tcl}
 
-        # Command line options to give to the Starpack to . Unset to not test.
-        # Obviously, this work across architectures.
+        # Command line options to run the Starpack with once it has been built.
+        # Unset to not test. Obviously, this won't work across incompatible
+        # platforms.
         testCommand         {version}
 
-        # The string to append to the targetFilename before the extension. If
-        # not set everything after the first dash in the targetTclkit's rootname
-        # is used. E.g, if targetTclkit is "tclkit-8.6.3-win32.exe" the
-        # default suffix will be "-8.6.3-win32.exe".
+        # The string to append to the targetFilename. If not set everything
+        # after the first dash in the targetTclkit's rootname is used. E.g, if
+        # targetTclkit is "tclkit-8.6.3-win32.exe" the default suffix will be
+        # "-8.6.3-win32.exe".
         # suffix {}
     }]
 }
@@ -139,16 +141,6 @@ proc ::packer::build args {
     }
 }
 
-proc ::packer::read-file {fname {binary 0}} {
-    set fpvar [open $fname r]
-    if {$binary} {
-        fconfigure $fpvar -translation binary
-    }
-    set content [read $fpvar]
-    close $fpvar
-    return $content
-}
-
 proc ::packer::write-file {fname content {binary 0}} {
     set fpvar [open $fname w]
     if {$binary} {
@@ -163,10 +155,6 @@ proc ::packer::with-path {path code} {
     cd $path
     uplevel 1 $code
     cd $prevPath
-}
-
-proc ::packer::add-suffix-before-extension {filename suffix} {
-    return "[file rootname $filename]$suffix[file extension $filename]"
 }
 
 proc ::packer::sl script {
