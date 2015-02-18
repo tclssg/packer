@@ -218,7 +218,7 @@ proc ::packer::build args {
 
 proc ::packer::utc-date-time {} {
     return [clock format [clock seconds] \
-            -format {%Y-%m-%d %H:%M:%S UTC} -locale UTC]
+            -format {%Y-%m-%d %H:%M:%S UTC} -timezone UTC]
 }
 
 # Write $content to file $fname.
