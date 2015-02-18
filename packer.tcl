@@ -3,10 +3,14 @@
 # Copyright (C) 2015 Danyil Bohdan.
 # License: MIT
 
-namespace eval ::packer {}
+package require Tcl 8.5
+
+namespace eval ::packer {
+    variable version 0.3
+}
 
 proc ::packer::init {} {
-    variable exampleBuildOptions [::packer::sl {
+    variable defaultBuildOptions [::packer::sl {
         # Where Packer's files are located.
         packerPath          [pwd]
 
@@ -14,7 +18,7 @@ proc ::packer::init {} {
         # Can be relative (to packerPath) or absolute.
         buildPath           build
 
-        # The path where to place the resulting Starpacks.
+        # The path where to place the resulting Starpack.
         # Can be relative (to packerPath) or absolute.
         artifactsPath       artifacts
 
@@ -41,8 +45,49 @@ proc ::packer::init {} {
         # automatically.
         targetFilename      "tclssg"
 
-        # Which file within the projectDir the Starpack should run on start.
-        fileToRun           {ssg.tcl}
+        # Which file within the projectDir the Starpack should sourced on start.
+        fileToSource        {ssg.tcl}
+
+        # An anonymous function to be run when the the Starpack starts on
+        # Windows. If set and not empty it is run *instead of* simply sourcing
+        # the file in fileToSource like on other platforms.
+        windowsScript       {{fileToSource argv0 argv} {
+            # This anonymous function sets up the console window, creates a new
+            # thread for Tclssg and makes sure Tclssg's output goes in the said
+            # console window, asynchronously.
+            console show
+            console title Tclssg
+
+            # Quit when the console window is closed.
+            console eval {
+                wm protocol . WM_DELETE_WINDOW {
+                    consoleinterp eval {
+                        exit 0
+                    }
+                }
+                set ::tk::console::maxLines 5000
+            }
+
+            # Run Tclssg in a separate thread.
+            package require Thread
+            set tid [::thread::create]
+            ::thread::send $tid [list source $fileToSource]
+            ::thread::send $tid [list set argv0 $argv0]
+            ::thread::send $tid [list set argv $argv]
+            ::thread::send $tid [list apply {{consoleThread} {
+                rename puts puts-old
+                proc puts args [list apply {{consoleThread} {
+                    upvar 1 args args
+                    if {[llength $args] == 1} {
+                        ::thread::send $consoleThread [list puts {*}$args]
+                    } else {
+                        puts-old {*}$args
+                    }
+                }} $consoleThread]
+            }} [::thread::id]]
+            ::thread::send -async $tid {::tclssg::main $argv0 $argv} done
+            vwait done
+        }}
 
         # Command line options to run the Starpack with once it has been built.
         # Unset to not test. Obviously, this won't work across incompatible
@@ -57,6 +102,8 @@ proc ::packer::init {} {
     }]
 }
 
+# Build a Starpack. $args is a directory; see variable defaultBuildOptions for
+# keys.
 proc ::packer::build args {
     # Parse command line arguments.
     dict for {key value} $args {
@@ -78,6 +125,7 @@ proc ::packer::build args {
         tclkit [file join . $buildTclkit] \
     ] {
         proc ::packer::$procName args [list apply {{command} {
+            package require platform
             upvar 1 args args
             exec -ignorestderr -- {*}$command {*}$args
         }} $command]
@@ -97,16 +145,30 @@ proc ::packer::build args {
 
         file rename $projectDir "${projectDir}.vfs"
 
-        # Create the file main.tcl to start $fileToRun.
+        # Create the file main.tcl to start $fileToSource.
         write-file [file join "${projectDir}.vfs" main.tcl] [list \
-            apply {{fileToRun} {
+            apply {{fileToSource windowsScript} {
                 global argv
                 global argv0
+                global tcl_platform
+
                 package require starkit
+
                 if {[starkit::startup] ne "sourced"} {
-                    source [file join $starkit::topdir $fileToRun]
+                    if {($tcl_platform(platform) eq "windows") &&
+                            ($windowsScript ne "")} {
+                        package require Tk
+                        wm withdraw .
+                        apply $windowsScript \
+                                [file join $starkit::topdir $fileToSource] \
+                                $argv0 \
+                                $argv
+                    } else {
+                        source [file join $starkit::topdir $fileToSource]
+                    }
                 }
-            }} $fileToRun
+            }} $fileToSource \
+                    [expr {[info exists windowsScript] ? $windowsScript : ""}]
         ]
 
         # Unpack Tcllib and install it in lib/tcllib subdirectory of the Starkit
@@ -138,9 +200,13 @@ proc ::packer::build args {
         set artifactFilename "$targetFilename$suffix"
         file copy -force $targetFilename \
                 [file join $artifactsPath $artifactFilename]
+
+        # Remove build directory.
+        file delete -force $buildPath
     }
 }
 
+# Write $content to file $fname.
 proc ::packer::write-file {fname content {binary 0}} {
     set fpvar [open $fname w]
     if {$binary} {
@@ -150,6 +216,7 @@ proc ::packer::write-file {fname content {binary 0}} {
     close $fpvar
 }
 
+# Run $code in directory $path.
 proc ::packer::with-path {path code} {
     set prevPath [pwd]
     cd $path
@@ -157,6 +224,7 @@ proc ::packer::with-path {path code} {
     cd $prevPath
 }
 
+# Parse scripted list.
 proc ::packer::sl script {
     # By Poor Yorick. From http://wiki.tcl.tk/39972.
     set res {}
