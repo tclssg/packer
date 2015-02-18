@@ -1,5 +1,5 @@
 #!/usr/bin/env tclsh
-# Producer, a Starpack creation script.
+# Packer, a tool for creating Starpacks out of Git repositories.
 # Copyright (C) 2015 Danyil Bohdan.
 # License: MIT
 
