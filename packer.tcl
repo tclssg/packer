@@ -6,7 +6,7 @@
 package require Tcl 8.5
 
 namespace eval ::packer {
-    variable version 0.3
+    variable version 0.5
 }
 
 proc ::packer::init {} {
@@ -52,45 +52,8 @@ proc ::packer::init {} {
         # Windows. If set and not empty it is run *instead of* simply sourcing
         # the file in fileToSource like on other platforms.
         windowsScript       {{fileToSource argv0 argv} {
-            # This anonymous function sets up the console window, creates a new
-            # thread for Tclssg and makes sure Tclssg's output goes in the said
-            # console window, asynchronously.
-            package require Tk
-            wm withdraw .
-            console show
-            console title Tclssg
-
-            # Quit when the console window is closed.
-            console eval {
-                wm protocol . WM_DELETE_WINDOW {
-                    consoleinterp eval {
-                        exit 0
-                    }
-                }
-                set ::tk::console::maxLines 5000
-            }
-
-            # Run Tclssg in a separate thread.
-            package require Thread
-            set tid [::thread::create]
-            ::thread::send $tid [list source $fileToSource]
-            ::thread::send $tid [list set argv0 $argv0]
-            ::thread::send $tid [list set argv $argv]
-            ::thread::send $tid [list apply {{consoleThread} {
-                rename puts puts-old
-                proc puts args [list apply {{consoleThread} {
-                    upvar 1 args args
-                    if {[llength $args] == 1} {
-                        ::thread::send $consoleThread [list puts {*}$args]
-                    } else {
-                        puts-old {*}$args
-                    }
-                }} $consoleThread]
-            }} [::thread::id]]
-            ::thread::send -async $tid {
-                ::tclssg::main $argv0 $argv
-            } done
-            vwait done
+            source $fileToSource
+            ::tclssg::main $argv0 $argv
         }}
 
         # Command line options to run the Starpack with once it has been built.
