@@ -114,9 +114,6 @@ proc ::packer::build args {
     # Defaults and mutation ahead.
     set buildPath [file join $packerPath $buildPath]
     set artifactsPath [file join $packerPath $artifactsPath]
-    if {![info exists suffix]} {
-        set suffix -[join [lrange [split $targetTclkit -] 1 end] -]
-    }
 
     # Define procs for running external commands.
     foreach {procName command} [list \
@@ -139,6 +136,10 @@ proc ::packer::build args {
         git clone $sourceRepository
         with-path $projectDir {
             set commit [git rev-parse HEAD]
+        }
+
+        if {![info exists suffix]} {
+            set suffix -[string range $commit 0 9]-$targetTclkit
         }
 
         foreach file [list $buildTclkit $targetTclkit $sdx $tcllib] {
