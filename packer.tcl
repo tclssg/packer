@@ -55,6 +55,8 @@ proc ::packer::init {} {
             # This anonymous function sets up the console window, creates a new
             # thread for Tclssg and makes sure Tclssg's output goes in the said
             # console window, asynchronously.
+            package require Tk
+            wm withdraw .
             console show
             console title Tclssg
 
@@ -85,7 +87,9 @@ proc ::packer::init {} {
                     }
                 }} $consoleThread]
             }} [::thread::id]]
-            ::thread::send -async $tid {::tclssg::main $argv0 $argv} done
+            ::thread::send -async $tid {
+                ::tclssg::main $argv0 $argv
+            } done
             vwait done
         }}
 
@@ -161,8 +165,6 @@ proc ::packer::build args {
                 if {[starkit::startup] ne "sourced"} {
                     if {($tcl_platform(platform) eq "windows") &&
                             ($windowsScript ne "")} {
-                        package require Tk
-                        wm withdraw .
                         apply $windowsScript \
                                 [file join $starkit::topdir $fileToSource] \
                                 $argv0 \
