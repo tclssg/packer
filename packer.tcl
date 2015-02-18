@@ -137,6 +137,9 @@ proc ::packer::build args {
 
     with-path $buildPath {
         git clone $sourceRepository
+        with-path $projectDir {
+            set commit [git rev-parse HEAD]
+        }
 
         foreach file [list $buildTclkit $targetTclkit $sdx $tcllib] {
             file copy -force [file join $packerPath $file] .
@@ -203,7 +206,18 @@ proc ::packer::build args {
 
         # Remove build directory.
         file delete -force $buildPath
+
+        # Record build information in a Tcl-readable format.
+        write-file [file join $artifactsPath "$artifactFilename.txt"] [sl {
+            $artifactFilename built [utc-date-time] from $sourceRepository
+            commit $commit.
+        }]\n
     }
+}
+
+proc ::packer::utc-date-time {} {
+    return [clock format [clock seconds] \
+            -format {%Y-%m-%d %H:%M:%S UTC} -locale UTC]
 }
 
 # Write $content to file $fname.

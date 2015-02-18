@@ -15,7 +15,7 @@ set tclkits [::packer::sl {
     win32           tclkit-8.6.3-win32.exe
 }]
 
-proc get-tclkit-for-currrent-platform {} {
+proc get-tclkit-for-current-platform {} {
     global tclkits
     dict for {key value} $tclkits {
         if {[string compare -length [string length $key] \
@@ -26,7 +26,7 @@ proc get-tclkit-for-currrent-platform {} {
     error "Unknown platform: [::platform::generic]"
 }
 
-set buildTclkit [get-tclkit-for-currrent-platform]
+set buildTclkit [get-tclkit-for-current-platform]
 
 foreach targetTclkit [dict values $tclkits] {
     set buildOptions $::packer::defaultBuildOptions

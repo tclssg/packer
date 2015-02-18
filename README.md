@@ -4,8 +4,6 @@ A tool for building Starpacks that include Tcllib. Builds Starpacks of [Tclssg](
 
 ## Components
 
-Tclkits built using Roy Keene's [KitCreator](http://kitcreator.rkeene.org/).
-
-SDX comes from the [Tclkit](http://equi4.com/tclkit/) project.
-
-[Tcllib](http://tcllib.sourceforge.net/).
+* Tclkits built using Roy Keene's [KitCreator](http://kitcreator.rkeene.org/).
+* SDX from the [Tclkit](http://equi4.com/tclkit/) project.
+* [Tcllib](http://tcllib.sourceforge.net/).
