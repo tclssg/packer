@@ -6,7 +6,7 @@
 package require Tcl 8.5
 
 namespace eval ::packer {
-    variable version 0.5
+    variable version 0.6
 }
 
 proc ::packer::init {} {
@@ -23,30 +23,34 @@ proc ::packer::init {} {
         artifactsPath       artifacts
 
         # The Tclkit to run SDX with.
-        buildTclkit         {tclkit-8.6.3-rhel5-x86_64}
+        buildTclkit         tclkit-8.6.3-rhel5-x86_64
 
         # The Tclkit to use as the runtime in the Starpack.
-        targetTclkit        {tclkit-8.6.3-rhel5-x86_64}
+        targetTclkit        tclkit-8.6.3-rhel5-x86_64
 
         # SDX Starkit file.
-        sdx                 {sdx-20110317.kit}
+        sdx                 sdx-20110317.kit
 
         # Tcllib archive file.
-        tcllib              {Tcllib-1.16.tar.gz}
+        tcllib              Tcllib-1.16.tar.gz
 
         # The Git repository to clone. Can be local or remote.
-        sourceRepository    {https://github.com/tclssg/tclssg}
+        sourceRepository    https://github.com/tclssg/tclssg
+
+        # The name of the commit or tag to check out of the repository. Blank
+        # for HEAD. Leave at %AUTO% for the latest HEAD commit.
+        checkout            %AUTO%
 
         # The directory that will appear once the sourceRepository is cloned.
-        projectDir          {tclssg}
+        projectDir          tclssg
 
         # The filename of the Starpack to create. Normally should not include an
         # extension -- see "suffix" below for how extensions are added
         # automatically.
-        targetFilename      "tclssg"
+        targetFilename      tclssg
 
         # Which file within the projectDir the Starpack should sourced on start.
-        fileToSource        {ssg.tcl}
+        fileToSource        ssg.tcl
 
         # An anonymous function to be run when the the Starpack starts on
         # Windows. If set and not empty it is run *instead of* simply sourcing
@@ -59,23 +63,35 @@ proc ::packer::init {} {
         # Command line options to run the Starpack with once it has been built.
         # Unset to not test. Obviously, this won't work across incompatible
         # platforms.
-        testCommand         {version}
+        testCommand         version
 
-        # The string to append to the targetFilename. If not set everything
-        # after the first dash in the targetTclkit's rootname is used. E.g, if
-        # targetTclkit is "tclkit-8.6.3-win32.exe" the default suffix will be
-        # "-8.6.3-win32.exe".
-        # suffix {}
+        # The string to append to the targetFilename. If set to %AUTO%
+        # everything after the first dash in the targetTclkit's rootname is
+        # used. E.g, if targetTclkit is "tclkit-8.6.3-win32.exe" the default
+        # suffix will be "-8.6.3-win32.exe".
+        suffix              %AUTO%
     }]
 }
+
+proc ::packer::sha-1? s {
+    return [regexp {^[a-fA-F0-9]{40}$} $s]
+}
+
+proc ::packer::auto? key {
+    return [expr { $key eq {%AUTO%} }]
+}
+
 
 # Build a Starpack. $args is a directory; see variable defaultBuildOptions for
 # keys.
 proc ::packer::build args {
-    # Parse command line arguments.
-    dict for {key value} $args {
-        puts [format {%23s: %s} $key $value]
-        set $key $value
+    # Parse $args.
+    dict for {key _} $::packer::defaultBuildOptions {
+        if {[dict exists $args $key]} {
+            set value [dict get $args $key]
+            puts [format {%23s: %s} $key $value]
+            set $key $value
+        }
     }
 
     # Defaults and mutation ahead.
@@ -102,11 +118,20 @@ proc ::packer::build args {
     with-path $buildPath {
         git clone $sourceRepository
         with-path $projectDir {
-            set commit [git rev-parse HEAD]
+            if {[auto? $checkout]} {
+                set checkout [git rev-parse HEAD]
+            } else {
+                git checkout $checkout
+            }
         }
 
-        if {![info exists suffix]} {
-            set suffix -[string range $commit 0 9]-$targetTclkit
+        if {[auto? $suffix]} {
+            # Abbreviate SHA-1 sums.
+            if {[sha-1? $checkout]} {
+                set suffix -[string range $checkout 0 9]-$targetTclkit
+            } else {
+                set suffix -$checkout-$targetTclkit
+            }
         }
 
         foreach file [list $buildTclkit $targetTclkit $sdx $tcllib] {
@@ -176,7 +201,7 @@ proc ::packer::build args {
         # Record build information in a Tcl-readable format.
         write-file [file join $artifactsPath "$artifactFilename.txt"] [sl {
             $artifactFilename built [utc-date-time] from $sourceRepository
-            commit $commit.
+            checkout $checkout.
         }]\n
     }
 }

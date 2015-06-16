@@ -3,6 +3,8 @@
 # Copyright (C) 2015 Danyil Bohdan.
 # License: MIT
 
+# Usage: build.tcl [checkout]
+
 package require platform
 
 set packerPath [file dirname [file dirname [file normalize $argv0/___]]]
@@ -31,7 +33,10 @@ set buildTclkit [get-tclkit-for-current-platform]
 foreach targetTclkit [dict values $tclkits] {
     set buildOptions $::packer::defaultBuildOptions
 
-    #dict set buildOptions sourceRepository [file normalize ..]
+    set checkout [lindex $argv 0]
+    if {$checkout ne {}} {
+        dict set buildOptions checkout $checkout
+    }
 
     file tempfile buildPath packer-build
     puts $buildPath
