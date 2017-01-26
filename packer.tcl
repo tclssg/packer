@@ -6,7 +6,7 @@
 package require Tcl 8.5
 
 namespace eval ::packer {
-    variable version 0.6
+    variable version 0.6.0
 }
 
 proc ::packer::init {} {
