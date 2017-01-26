@@ -1,6 +1,6 @@
 #!/usr/bin/env tclsh
 # Packer, a tool for creating Starpacks out of Git repositories.
-# Copyright (C) 2015 Danyil Bohdan.
+# Copyright (c) 2015, 2017 dbohdan.
 # License: MIT
 
 package require Tcl 8.5
@@ -231,7 +231,7 @@ proc ::packer::with-path {path code} {
 
 # Parse scripted list.
 proc ::packer::sl script {
-    # By Poor Yorick. From http://wiki.tcl.tk/39972.
+    # By Poor Yorick. From https://tcl.wiki/39972.
     set res {}
     set parts {}
     foreach part [split $script \n] {
