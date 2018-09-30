@@ -1,74 +1,74 @@
 #!/usr/bin/env tclsh
 # Packer, a tool for creating Starpacks out of Git repositories.
-# Copyright (c) 2015, 2017 dbohdan.
+# Copyright (c) 2015, 2017, 2018 dbohdan.
 # License: MIT
 
-package require Tcl 8.5
+package require Tcl 8.6
 
 namespace eval ::packer {
-    variable version 0.6.0
+    variable version 0.7.0
 }
 
 proc ::packer::init {} {
-    variable defaultBuildOptions [::packer::sl {
+    variable defaultBuildOptions [sl {
         # Where Packer's files are located.
         packerPath          [pwd]
 
-        # The path to the temporary directory in which the Starpacks are built.
+        # The path to the temporary directory in which the Starpacks are to be
+        # built.
         # Can be relative (to packerPath) or absolute.
         buildPath           build
 
-        # The path where to place the resulting Starpack.
+        # The path where to place the built Starpacks.
         # Can be relative (to packerPath) or absolute.
         artifactsPath       artifacts
 
-        # The Tclkit to run SDX with.
+        # The Tclkit with which to run SDX.
         buildTclkit         tclkit-8.6.3-rhel5-x86_64
 
-        # The Tclkit to use as the runtime in the Starpack.
-        targetTclkit        tclkit-8.6.3-rhel5-x86_64
+        # A list of the Tclkits to use as Starpack runtimes.
+        targetTclkits       tclkit-8.6.3-rhel5-x86_64
 
-        # SDX Starkit file.
+        # The SDX Starkit file.
         sdx                 sdx-20110317.kit
 
-        # Tcllib archive file.
+        # The Tcllib archive file.
         tcllib              Tcllib-1.16.tar.gz
 
-        # The Git repository to clone. Can be local or remote.
+        # The Git repository to clone.  Can be local or remote.
         sourceRepository    https://github.com/tclssg/tclssg
 
-        # The name of the commit or tag to check out of the repository. Blank
-        # for HEAD. Leave at %AUTO% for the latest HEAD commit.
-        checkout            %AUTO%
+        # The name of the commit, branch, or tag to check out of the repository.
+        revision            master
 
         # The directory that will appear once the sourceRepository is cloned.
         projectDir          tclssg
 
-        # The filename of the Starpack to create. Normally should not include an
-        # extension -- see "suffix" below for how extensions are added
-        # automatically.
+        # The filename of the Starpack to create.  Normally should not include
+        # an extension -- see the "suffix" option below for how extensions are
+        # automatically added.
         targetFilename      tclssg
 
-        # Which file within the projectDir the Starpack should sourced on start.
+        # Which file within the projectDir the Starpack should source on start.
         fileToSource        ssg.tcl
 
-        # An anonymous function to be run when the the Starpack starts on
-        # Windows. If set and not empty it is run *instead of* simply sourcing
-        # the file in fileToSource like on other platforms.
-        windowsScript       {{fileToSource argv0 argv} {
-            source $fileToSource
+        # A script to evaluate when the Starpack starts on Windows.  If set and
+        # not empty it is run *instead of* sourcing the file in fileToSource
+        # like on other platforms.
+        windowsScript       {
+            source [file join $starkit::topdir app $fileToSource]
             ::tclssg::main $argv0 $argv
-        }}
+        }
 
-        # Command line options to run the Starpack with once it has been built.
-        # Unset to not test. Obviously, this won't work across incompatible
+        # The command line options to run the Starpack with once it has been
+        # built.  Unset to not test.  This will not work across incompatible
         # platforms.
         testCommand         version
 
-        # The string to append to the targetFilename. If set to %AUTO%
+        # The string to append to the targetFilename.  If set to %AUTO%,
         # everything after the first dash in the targetTclkit's rootname is
-        # used. E.g, if targetTclkit is "tclkit-8.6.3-win32.exe" the default
-        # suffix will be "-8.6.3-win32.exe".
+        # used.  E.g, if targetTclkit is "tclkit-8.6.3-win32.exe", then the
+        # automatic suffix will be "-8.6.3-win32.exe".
         suffix              %AUTO%
     }]
 }
@@ -81,155 +81,166 @@ proc ::packer::auto? key {
     return [expr { $key eq {%AUTO%} }]
 }
 
+proc ::packer::run args {
+    return [exec -ignorestderr -- {*}$args]
+}
 
-# Build a Starpack. $args is a directory; see variable defaultBuildOptions for
-# keys.
+proc ::packer::opt {key {default %NONE%}} {
+    upvar 1 options options
+    if {[dict exists $options $key]} {
+        return [dict get $options $key]
+    } elseif {$default ne {%NONE%}} {
+        return $default
+    } else {
+        error [list no key $key in options]
+    }
+}
+
+# Build Starpacks.  $args is a dictionary; see the variable defaultBuildOptions
+# for the keys.
 proc ::packer::build args {
     # Parse $args.
-    dict for {key _} $::packer::defaultBuildOptions {
-        if {[dict exists $args $key]} {
-            set value [dict get $args $key]
-            puts [format {%23s: %s} $key $value]
-            set $key $value
-        }
+    set options [dict merge $::packer::defaultBuildOptions $args]
+    dict for {key value} $options {
+        puts [format {%-18s %s} $key [list $value]]
     }
 
-    # Defaults and mutation ahead.
-    set buildPath [file join $packerPath $buildPath]
-    set artifactsPath [file join $packerPath $artifactsPath]
-
-    # Define procs for running external commands.
-    foreach {procName command} [list \
-        git git \
-        tar tar \
-        tclkit [file join . $buildTclkit] \
-    ] {
-        proc ::packer::$procName args [list apply {{command} {
-            package require platform
-            upvar 1 args args
-            exec -ignorestderr -- {*}$command {*}$args
-        }} $command]
-    }
+    set fullBuildPath [file join [opt packerPath] [opt buildPath]]
+    set fullArtifactsPath [file join [opt packerPath] [opt artifactsPath]]
 
     # Build start.
-    file delete -force $buildPath
-    file mkdir $buildPath
+    file delete -force $fullBuildPath
+    file mkdir $fullBuildPath
 
-    with-path $buildPath {
-        git clone $sourceRepository
-        with-path $projectDir {
-            if {[auto? $checkout]} {
-                set checkout [git rev-parse HEAD]
-            } else {
-                git checkout $checkout
-            }
+    with-path $fullBuildPath {
+        run git clone [opt sourceRepository]
+        with-path [opt projectDir] {
+            run git checkout [opt revision]
+            set commit [run git rev-parse HEAD]
         }
 
-        if {[auto? $suffix]} {
-            # Abbreviate SHA-1 sums.
-            if {[sha-1? $checkout]} {
-                set suffix -[string range $checkout 0 9]-$targetTclkit
-            } else {
-                set suffix -$checkout-$targetTclkit
-            }
+        foreach path [list [opt buildTclkit] \
+                           [opt sdx] \
+                           [opt tcllib] \
+                           {*}[opt targetTclkits]] {
+            file copy -force [file join [opt packerPath] $path] .
         }
+        catch { file attributes [opt buildTclkit] -permissions +x }
 
-        foreach file [list $buildTclkit $targetTclkit $sdx $tcllib] {
-            file copy -force [file join $packerPath $file] .
-        }
-        file attributes $buildTclkit -permissions +x
+        file mkdir vfs
+        file rename [opt projectDir] vfs/app
 
-        file rename $projectDir "${projectDir}.vfs"
+        # Create the file main.tcl to start fileToSource.
+        set mainScript [regsub -all {\n            } [format {
+            package require starkit
 
-        # Create the file main.tcl to start $fileToSource.
-        write-file [file join "${projectDir}.vfs" main.tcl] [list \
-            apply {{fileToSource windowsScript} {
-                global argv
-                global argv0
-                global tcl_platform
-
-                package require starkit
-
-                if {[starkit::startup] ne "sourced"} {
-                    if {($tcl_platform(platform) eq "windows") &&
-                            ($windowsScript ne "")} {
-                        apply $windowsScript \
-                                [file join $starkit::topdir $fileToSource] \
-                                $argv0 \
-                                $argv
-                    } else {
-                        source [file join $starkit::topdir $fileToSource]
-                    }
+            if {[starkit::startup] ne "sourced"} {
+                set fileToSource %s
+                set argv0 [file join $starkit::topdir app $fileToSource]
+                if {$tcl_platform(platform) eq "windows"} {
+                    eval %s
+                } else {
+                    source [file join $starkit::topdir app $fileToSource]
                 }
-            }} $fileToSource \
-                    [expr {[info exists windowsScript] ? $windowsScript : ""}]
-        ]
+            }
+        } [list [opt fileToSource]] [list [opt windowsScript]]] \n]
+        write-file vfs/main.tcl $mainScript
 
-        # Unpack Tcllib and install it in lib/tcllib subdirectory of the Starkit
-        # VFS.
-        tar zxvf $tcllib
-
-        with-path [regsub {.tar.gz$} $tcllib {}] {
-            puts [exec -- \
-                    tclsh ./installer.tcl -no-wait -no-gui -no-html -no-nroff \
-                    -no-examples -no-apps -pkgs -pkg-path \
-                    [file join $buildPath "${projectDir}.vfs" lib tcllib]]
+        # Unpack Tcllib and install it in the subdirectory lib/tcllib of the
+        # Starkit VFS.
+        run tar zxf [opt tcllib]
+        with-path [regsub {.tar.gz$} [opt tcllib] {}] {
+            run {*}[sl {
+                >@ stdout
+                tclsh
+                ./installer.tcl -no-wait
+                                -no-gui
+                                -no-html
+                                -no-nroff
+                                -no-examples
+                                -no-apps
+                                -pkgs
+                                -pkg-path [file join $fullBuildPath \
+                                                     vfs/lib/tcllib]
+            }]
         }
 
-        # Wrap the Starpack. We make a temporary copy of the targetTclkit
-        # in case it is the same as buildTclkit, which we wouldn't be able to
+        # Wrap the Starpack.  We make a temporary copy of each targetTclkit in
+        # case it is the same as the buildTclkit, which we may not be able to
         # read.
-        file copy $targetTclkit "${targetTclkit}.temp"
-        tclkit $sdx wrap $targetFilename -runtime "${targetTclkit}.temp"
-        file delete "${targetTclkit}.temp"
+        foreach targetTclkit [opt targetTclkits] {
+            puts stderr [list building starpack with runtime $targetTclkit]
+            file copy $targetTclkit ${targetTclkit}.temp
+            run ./[opt buildTclkit] \
+                [opt sdx] wrap [opt targetFilename] \
+                               -vfs vfs \
+                               -runtime ${targetTclkit}.temp
+            file delete ${targetTclkit}.temp
+            # Run the test command.
+            if {[info exists testCommand]} {
+                file attributes [opt targetFilename] -permissions +x
+                puts [exec -- [file join . [opt targetFilename] \
+                                           {*}[opt testCommand]]]
+            }
 
-        # Run the test command.
-        if {[info exists testCommand]} {
-            file attributes $targetFilename -permissions +x
-            puts [exec -- [file join . $targetFilename] {*}$testCommand]
+            if {[auto? [opt suffix]]} {
+                # Abbreviate commit checksum.
+                set fullSuffix -[opt revision]-[string range $commit 0 9]
+                append fullSuffix -$targetTclkit
+            } else {
+                set fullSuffix [opt suffix]
+            }
+
+            # Store the build artifact.
+            file mkdir $fullArtifactsPath
+            set artifactFilename [opt targetFilename]$fullSuffix
+            file copy -force [opt targetFilename] \
+                             [file join $fullArtifactsPath $artifactFilename]
+
+            # Record build information in a Tcl-readable format.
+            write-file [file join $fullArtifactsPath \
+                                  ${artifactFilename}.txt] [sl {
+                $artifactFilename
+                built [utc-date-time]
+                from [opt sourceRepository]
+                revision [opt revision]
+                commit $commit
+            }]\n
         }
-
-        # Store the build artifact.
-        file mkdir $artifactsPath
-        set artifactFilename "$targetFilename$suffix"
-        file copy -force $targetFilename \
-                [file join $artifactsPath $artifactFilename]
 
         # Remove build directory.
-        file delete -force $buildPath
-
-        # Record build information in a Tcl-readable format.
-        write-file [file join $artifactsPath "$artifactFilename.txt"] [sl {
-            $artifactFilename built [utc-date-time] from $sourceRepository
-            checkout $checkout.
-        }]\n
+        file delete -force $fullBuildPath
     }
 }
 
 proc ::packer::utc-date-time {} {
     return [clock format [clock seconds] \
-            -format {%Y-%m-%d %H:%M:%S UTC} -timezone UTC]
+                         -format {%Y-%m-%d %H:%M:%S UTC} \
+                         -timezone UTC]
 }
 
-# Write $content to file $fname.
-proc ::packer::write-file {fname content {binary 0}} {
-    set fpvar [open $fname w]
+# Write $content to the file $path.
+proc ::packer::write-file {path content {binary 0}} {
+    set ch [open $path w]
     if {$binary} {
-        fconfigure $fpvar -translation binary
+        fconfigure $ch -translation binary
     }
-    puts -nonewline $fpvar $content
-    close $fpvar
+    puts -nonewline $ch $content
+    close $ch
 }
 
-# Run $code in directory $path.
+# Run $code in the directory $path.
 proc ::packer::with-path {path code} {
     set prevPath [pwd]
-    cd $path
-    uplevel 1 $code
-    cd $prevPath
+    try {
+        cd $path
+        uplevel 1 $code
+    } finally {
+        cd $prevPath
+    }
 }
 
-# Parse scripted list.
+# Parse a scripted list.
 proc ::packer::sl script {
     # By Poor Yorick. From https://tcl.wiki/39972.
     set res {}
