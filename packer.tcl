@@ -56,7 +56,7 @@ proc ::packer::init {} {
         # not empty it is run *instead of* sourcing the file in fileToSource
         # like on other platforms.
         windowsScript       {
-            source [file join $starkit::topdir app $fileToSource]
+            source $argv0
             ::tclssg::main $argv0 $argv
         }
 
@@ -135,12 +135,11 @@ proc ::packer::build args {
             package require starkit
 
             if {[starkit::startup] ne "sourced"} {
-                set fileToSource %s
-                set argv0 [file join $starkit::topdir app $fileToSource]
+                set argv0 [file join $starkit::topdir app %s]
                 if {$tcl_platform(platform) eq "windows"} {
                     eval %s
                 } else {
-                    source [file join $starkit::topdir app $fileToSource]
+                    source $argv0
                 }
             }
         } [list [opt fileToSource]] [list [opt windowsScript]]] \n]
