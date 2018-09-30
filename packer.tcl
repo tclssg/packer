@@ -152,7 +152,7 @@ proc ::packer::build args {
         with-path [regsub {.tar.gz$} [opt tcllib] {}] {
             run {*}[sl {
                 >@ stdout
-                tclsh
+                [file join .. [opt buildTclkit]]
                 ./installer.tcl -no-wait
                                 -no-gui
                                 -no-html
@@ -171,7 +171,7 @@ proc ::packer::build args {
         foreach targetTclkit [opt targetTclkits] {
             puts stderr [list building starpack with runtime $targetTclkit]
             file copy $targetTclkit ${targetTclkit}.temp
-            run ./[opt buildTclkit] \
+            run [file join . [opt buildTclkit]] \
                 [opt sdx] wrap [opt targetFilename] \
                                -vfs vfs \
                                -runtime ${targetTclkit}.temp
