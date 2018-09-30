@@ -128,6 +128,7 @@ proc ::packer::build args {
         catch { file attributes [opt buildTclkit] -permissions +x }
 
         file mkdir vfs
+        write-file vfs/git-commit $commit
         file rename [opt projectDir] vfs/app
 
         # Create the file main.tcl to start fileToSource.
