@@ -1,5 +1,7 @@
+TCLSH = tclsh
+
 all:
-	tclsh ./build.tcl
+	$(TCLSH) ./build.tcl
 clean:
 	rm -rf artifacts/*
 	rm -rf build/*
