@@ -1,12 +1,12 @@
 #!/usr/bin/env tclsh
 # Packer, a tool for creating Starpacks out of Git repositories.
-# Copyright (c) 2015, 2017, 2018, 2019 dbohdan.
+# Copyright (c) 2015, 2017, 2018, 2019, 2024 D. Bohdan
 # License: MIT
 
-package require Tcl 8.6
+package require Tcl 8.6 9
 
 namespace eval ::packer {
-    variable version 0.8.1
+    variable version 0.9.0
 }
 
 proc ::packer::init {} {
